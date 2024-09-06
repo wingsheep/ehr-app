@@ -15,6 +15,7 @@ import pie from 'puppeteer-in-electron'
 import { fileURLToPath } from 'url'
 import store from '../store/index.js'
 import appIcon from '../../build/icon.png?asset'
+import { platform } from 'node:os'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -26,17 +27,23 @@ let configWindow = null
 let userInfo = null
 let offDutyTime = null
 let startWorkTime = null
+let contextMenu = null
 // 在状态栏添加图标
 function createTray() {
   const icon = nativeImage.createFromPath(appIcon)
   icon.setTemplateImage(true)
   tray = new Tray(icon)
   createContextMenu()
+  tray.on('click', () => {
+    if (process.platform === 'win32') {
+      tray?.popUpContextMenu(contextMenu)
+    }
+  })
   return tray
 }
 // 创建托盘菜单
 function createContextMenu() {
-  const contextMenu = Menu.buildFromTemplate([
+  contextMenu = Menu.buildFromTemplate([
     {
       label: `登录账户: ${userInfo?.userName}`,
       visible: !!userInfo?.userName,
@@ -118,7 +125,7 @@ function createContextMenu() {
       }
     }
   ])
-  tray.setContextMenu(contextMenu)
+  tray?.setContextMenu(contextMenu)
 }
 // 初始化puppeteer pie
 ;(async () => {
@@ -153,7 +160,7 @@ async function logout() {
   isLoginAttempted = true
   userInfo = null
   intervalId && clearInterval(intervalId)
-  tray.setTitle('未登录')
+  setTrayText('未登录')
   store.set('showMainWindow', true)
   await clearCookiesAndStorage()
   await resetWindow()
@@ -185,6 +192,7 @@ function createConfigWindow() {
       sandbox: false
     }
   })
+  configWindow.setMenu(null)
   process.env.NODE_ENV === 'development' && configWindow.webContents.openDevTools()
 
   // configWindow.loadFile('form.html')
@@ -222,6 +230,12 @@ ipcMain.on('close-config-window', () => {
     configWindow.close()
   }
 })
+function setTrayText(text) {
+  if (tray) {
+    tray.setTitle(text)
+    process.platform === 'win32' && tray.setToolTip(text)
+  }
+}
 // 计算下班时间
 function addHoursToDateTime(baseDateTime, hoursToAdd = 9.5) {
   const [datePart, timePart] = baseDateTime.split(' ')
@@ -257,6 +271,7 @@ async function createWindow() {
       nodeIntegration: false // 禁用Node.js集成
     }
   })
+  mainWindow.setMenu(null)
   const browser = await pie.connect(app, puppeteer)
   mainWindow.loadURL('https://www.italent.cn')
   process.env.NODE_ENV === 'development' && mainWindow.webContents.openDevTools()
@@ -352,15 +367,15 @@ async function createWindow() {
           })
         }
         intervalId && clearInterval(intervalId)
-        tray.setTitle('未登录')
+        setTrayText('未登录')
         return false
       }
       userInfo = loginUserInfo
       startWorkTime = start
       createContextMenu()
-      if (!start) return tray.setTitle('暂无数据，点击刷新')
+      if (!start) return setTrayText('暂无数据，点击刷新')
       if (end) {
-        return tray.setTitle(`昨日下班已打卡：${end.split(' ')[1]}`)
+        return setTrayText(`昨日下班已打卡：${end.split(' ')[1]}`)
       }
       offDutyTime = addHoursToDateTime(start)
       createContextMenu()
@@ -385,11 +400,11 @@ async function createWindow() {
         const timeRemaining = targetDate - now
         const tolerance = 1000 // 允许1秒的误差范围
         if (timeRemaining > tolerance) {
-          tray.setTitle(getShowStr('距离下班还有', timeRemaining))
+          setTrayText(getShowStr('距离下班还有', timeRemaining))
           hasShownEndMessage = false
         } else if (timeRemaining <= tolerance && timeRemaining > -tolerance) {
           if (!hasShownEndMessage) {
-            tray.setTitle('今日工时已达标')
+            setTrayText('今日工时已达标')
             new Notification({
               title: '今日工时已达标',
               body: '下班别忘记打卡哦~'
@@ -398,7 +413,7 @@ async function createWindow() {
           }
         } else {
           const overtimeHours = now - targetDate
-          tray.setTitle(getShowStr('你已加班', overtimeHours))
+          setTrayText(getShowStr('你已加班', overtimeHours))
           hasShownEndMessage = false
           // 如果加班了一个半小时，如果在一分钟内通知一下
           if (overtimeHours / 1000 / 60 > 90 && overtimeHours / 1000 / 60 < 91) {
@@ -482,7 +497,7 @@ function resetWindow() {
   if (mainWindow) {
     mainWindow.close()
   }
-  tray.setTitle('加载中...')
+  setTrayText('加载中...')
   createWindow()
 }
 
