@@ -24,6 +24,8 @@ let intervalId = null
 let isLoginAttempted = false // 标记是否已尝试过登录
 let configWindow = null
 let userInfo = null
+let offDutyTime = null
+let startWorkTime = null
 // 在状态栏添加图标
 function createTray() {
   const icon = nativeImage.createFromPath(appIcon)
@@ -37,6 +39,16 @@ function createContextMenu() {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: `登录账户: ${userInfo?.userName}`,
+      visible: !!userInfo?.userName,
+      enabled: false
+    },
+    {
+      label: `打卡时间: ${startWorkTime || '未打卡'}`,
+      visible: !!userInfo?.userName,
+      enabled: false
+    },
+    {
+      label: `下班时间: ${offDutyTime || ''}`,
       visible: !!userInfo?.userName,
       enabled: false
     },
@@ -81,7 +93,7 @@ function createContextMenu() {
     },
     {
       label: '重新登录',
-      sublabel: '根据配置账户自动登录',
+      toolTip: '根据配置账户自动登录',
       visible: true,
       click: () => {
         againLogin()
@@ -344,12 +356,14 @@ async function createWindow() {
         return false
       }
       userInfo = loginUserInfo
+      startWorkTime = start
       createContextMenu()
       if (!start) return tray.setTitle('暂无数据，点击刷新')
       if (end) {
         return tray.setTitle(`昨日下班已打卡：${end.split(' ')[1]}`)
       }
-      const offDutyTime = addHoursToDateTime(start)
+      offDutyTime = addHoursToDateTime(start)
+      createContextMenu()
       const getShowStr = (text, timeDifference) => {
         const hours = Math.floor((timeDifference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
         const minutes = Math.floor((timeDifference % (1000 * 60 * 60)) / (1000 * 60))

@@ -1,5 +1,5 @@
 appId: com.electron.app
-productName: ehr-app
+productName: EHR Clock Out
 directories:
   buildResources: build
 files:
