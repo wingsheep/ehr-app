@@ -37,3 +37,7 @@ $ pnpm build:mac
 # For Linux
 $ pnpm build:linux
 ```
+
+
+### DEMO
+![](./PixPin_2025-01-21_20-01-52.png)
